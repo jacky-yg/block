@@ -35,6 +35,10 @@
 #include "leveldb/comparator.h"
 #include "leveldb/options.h"
 #include "util/coding.h"
+#include <iostream>
+#include <stdio.h>
+#include <string.h>
+#include <string>
 
 namespace leveldb {
 
@@ -69,11 +73,28 @@ Slice BlockBuilder::Finish() {
   return Slice(buffer_);
 }
 
+Slice BlockBuilder::ReturnContent() { //return the destination buffer
+  return Slice(buffer_);
+}
+
+std::string BlockBuilder::ReturnRestartsInfo() {
+  std::string restartp;
+  for (size_t i = 0; i < restarts_.size(); i++) {
+    PutFixed32(&restartp, restarts_[i]);
+  }
+  PutFixed32(&restartp, restarts_.size());
+
+  finished_ = true;
+  return restartp;
+}
+
+
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
   assert(counter_ <= options_->block_restart_interval);
-  assert(buffer_.empty()  // No values yet?
+  //2019/11/27
+  assert(buffer_.empty() // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
   if (counter_ < options_->block_restart_interval) {

@@ -16,6 +16,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
+SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+
 if (WIN32)
   set(LEVELDB_PLATFORM_NAME LEVELDB_PLATFORM_WINDOWS)
   # TODO(cmumford): Make UNICODE configurable for Windows.
@@ -38,6 +42,7 @@ include(CheckLibraryExists)
 check_library_exists(crc32c crc32c_value "" HAVE_CRC32C)
 check_library_exists(snappy snappy_compress "" HAVE_SNAPPY)
 check_library_exists(tcmalloc malloc "" HAVE_TCMALLOC)
+
 
 include(CheckCXXSymbolExists)
 # Using check_cxx_symbol_exists() instead of check_c_symbol_exists() because
@@ -103,6 +108,8 @@ int main() { std::string str; return 0; }
 
 set(LEVELDB_PUBLIC_INCLUDE_DIR "include/leveldb")
 set(LEVELDB_PORT_CONFIG_DIR "include/port")
+set(ISAL_CRYPTO_INCLUDE_DIR "/home/jacky/isa-l_crypto/include")
+set(ISAL_CRYPTO_LIB_DIR "/usr/lib")
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/port/port_config.h.in"
@@ -112,6 +119,7 @@ configure_file(
 include_directories(
   "${PROJECT_BINARY_DIR}/include"
   "${PROJECT_SOURCE_DIR}"
+  "${ISAL_CRYPTO_INCLUDE_DIR}"	
 )
 
 if(BUILD_SHARED_LIBS)
@@ -120,6 +128,10 @@ if(BUILD_SHARED_LIBS)
 endif(BUILD_SHARED_LIBS)
 
 add_library(leveldb "")
+add_library(libisal_crypto STATIC IMPORTED)
+
+set_target_properties(libisal_crypto PROPERTIES IMPORTED_LOCATION "${ISAL_CRYPTO_LIB_DIR}/libisal_crypto.a")
+
 target_sources(leveldb
   PRIVATE
     "${PROJECT_BINARY_DIR}/${LEVELDB_PORT_CONFIG_DIR}/port_config.h"
@@ -270,14 +282,15 @@ if(HAVE_CLANG_THREAD_SAFETY)
       -Werror -Wthread-safety)
 endif(HAVE_CLANG_THREAD_SAFETY)
 
+
 if(HAVE_CRC32C)
-  target_link_libraries(leveldb crc32c)
+  target_link_libraries(leveldb crc32c libisal_crypto)
 endif(HAVE_CRC32C)
 if(HAVE_SNAPPY)
-  target_link_libraries(leveldb snappy)
+  target_link_libraries(leveldb snappy libisal_crypto)
 endif(HAVE_SNAPPY)
 if(HAVE_TCMALLOC)
-  target_link_libraries(leveldb tcmalloc)
+  target_link_libraries(leveldb tcmalloc libisal_crypto)
 endif(HAVE_TCMALLOC)
 
 # Needed by port_stdcxx.h
@@ -287,7 +300,7 @@ target_link_libraries(leveldb Threads::Threads)
 add_executable(leveldbutil
   "${PROJECT_SOURCE_DIR}/db/leveldbutil.cc"
 )
-target_link_libraries(leveldbutil leveldb)
+target_link_libraries(leveldbutil leveldb libisal_crypto)
 
 if(LEVELDB_BUILD_TESTS)
   enable_testing()
@@ -306,7 +319,7 @@ if(LEVELDB_BUILD_TESTS)
 
         "${test_file}"
     )
-    target_link_libraries("${test_target_name}" leveldb)
+    target_link_libraries("${test_target_name}" leveldb libisal_crypto)
     target_compile_definitions("${test_target_name}"
       PRIVATE
         ${LEVELDB_PLATFORM_NAME}=1
@@ -333,6 +346,9 @@ if(LEVELDB_BUILD_TESTS)
   leveldb_test("${PROJECT_SOURCE_DIR}/util/no_destructor_test.cc")
 
   if(NOT BUILD_SHARED_LIBS)
+    leveldb_test("${PROJECT_SOURCE_DIR}/test/manifest_reader_test.cc")
+    leveldb_test("${PROJECT_SOURCE_DIR}/test/put_get_test.cc")
+    leveldb_test("${PROJECT_SOURCE_DIR}/test/table_builder_test.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/db/autocompact_test.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/db/corruption_test.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/db/db_test.cc")
@@ -385,7 +401,7 @@ if(LEVELDB_BUILD_BENCHMARKS)
 
         "${bench_file}"
     )
-    target_link_libraries("${bench_target_name}" leveldb)
+    target_link_libraries("${bench_target_name}" leveldb libisal_crypto)
     target_compile_definitions("${bench_target_name}"
       PRIVATE
         ${LEVELDB_PLATFORM_NAME}=1
@@ -405,7 +421,7 @@ if(LEVELDB_BUILD_BENCHMARKS)
   check_library_exists(sqlite3 sqlite3_open "" HAVE_SQLITE3)
   if(HAVE_SQLITE3)
     leveldb_benchmark("${PROJECT_SOURCE_DIR}/benchmarks/db_bench_sqlite3.cc")
-    target_link_libraries(db_bench_sqlite3 sqlite3)
+    target_link_libraries(db_bench_sqlite3 sqlite3 libisal_crypto)
   endif(HAVE_SQLITE3)
 
   # check_library_exists is insufficient here because the library names have
@@ -425,7 +441,7 @@ int main() {
   set(CMAKE_REQUIRED_LIBRARIES ${OLD_CMAKE_REQURED_LIBRARIES})
   if(HAVE_KYOTOCABINET)
     leveldb_benchmark("${PROJECT_SOURCE_DIR}/benchmarks/db_bench_tree_db.cc")
-    target_link_libraries(db_bench_tree_db kyotocabinet)
+    target_link_libraries(db_bench_tree_db kyotocabinet libisal_crypto)
   endif(HAVE_KYOTOCABINET)
 endif(LEVELDB_BUILD_BENCHMARKS)
 

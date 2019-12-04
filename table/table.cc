@@ -14,8 +14,14 @@
 #include "table/format.h"
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
+#include <iostream>
+#include <string>
+#include <sstream>
+
 
 namespace leveldb {
+
+std::string str;
 
 struct Table::Rep {
   ~Rep() {
@@ -57,10 +63,11 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
   if (s.ok()) {
     ReadOptions opt;
     if (options.paranoid_checks) {
-      opt.verify_checksums = true;
+      opt.verify_checksums = false;
     }
-    s = ReadBlock(file, opt, footer.index_handle(), &index_block_contents);
-  }
+
+    s = ReadIndexBlock(file, opt, footer.index_handle(), &index_block_contents);
+    }
 
   if (s.ok()) {
     // We've successfully read the footer and the index block: we're
@@ -93,7 +100,7 @@ void Table::ReadMeta(const Footer& footer) {
     opt.verify_checksums = true;
   }
   BlockContents contents;
-  if (!ReadBlock(rep_->file, opt, footer.metaindex_handle(), &contents).ok()) {
+  if (!ReadIndexBlock(rep_->file, opt, footer.metaindex_handle(), &contents).ok()) {
     // Do not propagate errors since meta info is not needed for operation
     return;
   }
@@ -124,7 +131,7 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
     opt.verify_checksums = true;
   }
   BlockContents block;
-  if (!ReadBlock(rep_->file, opt, filter_handle, &block).ok()) {
+  if (!ReadIndexBlock(rep_->file, opt, filter_handle, &block).ok()) {
     return;
   }
   if (block.heap_allocated) {
@@ -167,6 +174,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
 
   if (s.ok()) {
     BlockContents contents;
+    //std::string str;
     if (block_cache != nullptr) {
       char cache_key_buffer[16];
       EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
@@ -177,7 +185,9 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
         block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
       } else {
         s = ReadBlock(table->rep_->file, options, handle, &contents);
+        //std::cout<<contents.data.ToString()<<std::endl;
         if (s.ok()) {
+
           block = new Block(contents);
           if (contents.cachable && options.fill_cache) {
             cache_handle = block_cache->Insert(key, block, block->size(),
@@ -187,7 +197,9 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
       }
     } else {
       s = ReadBlock(table->rep_->file, options, handle, &contents);
+      //std::cout<<contents.data.ToString()<<std::endl;
       if (s.ok()) {
+
         block = new Block(contents);
       }
     }
@@ -195,6 +207,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
 
   Iterator* iter;
   if (block != nullptr) {
+	//std::cout<<"not null"<<std::endl;
     iter = block->NewIterator(table->rep_->options.comparator);
     if (cache_handle == nullptr) {
       iter->RegisterCleanup(&DeleteBlock, block, nullptr);
@@ -207,18 +220,22 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   return iter;
 }
 
+
 Iterator* Table::NewIterator(const ReadOptions& options) const {
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
       &Table::BlockReader, const_cast<Table*>(this), options);
 }
 
+
 Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
                           void (*handle_result)(void*, const Slice&,
                                                 const Slice&)) {
   Status s;
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
+  std::cout<<k.ToString()<<std::endl;
   iiter->Seek(k);
+  std::cout << iiter->key().ToString() << "->" << iiter->value().ToString() << std::endl;
   if (iiter->Valid()) {
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
@@ -229,7 +246,11 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
     } else {
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
+      std::cout<<"k:"<<k.ToString()<<"iter.key:"<<block_iter->key().ToString()<<std::endl;
+      /*block_iter->Next();
+      std::cout<<"k:"<<k.ToString()<<"iter.key:"<<block_iter->key().ToString()<<std::endl;*/
       if (block_iter->Valid()) {
+
         (*handle_result)(arg, block_iter->key(), block_iter->value());
       }
       s = block_iter->status();

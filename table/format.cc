@@ -9,8 +9,22 @@
 #include "table/block.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+#include "aes_gcm.h"
+#include <iostream>
+#include "table/two_level_iterator.h"
+#include "leveldb/options.h"
+#include "leveldb/comparator.h"
 
+#define TXT_SIZE  8
+#define AAD_SIZE 32
+#define TAG_SIZE 16		/* Valid values are 16, 12, or 8 */
+#define KEY_SIZE GCM_256_KEY_LEN
+#define IV_SIZE  GCM_IV_DATA_LEN
+
+std::string p;
+std::string i;
 namespace leveldb {
+
 
 void BlockHandle::EncodeTo(std::string* dst) const {
   // Sanity check that all fields have been set
@@ -70,6 +84,144 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
   // Read the block contents as well as the type/crc footer.
   // See table_builder.cc for the code that built this structure.
   size_t n = static_cast<size_t>(handle.size());
+  char* buf = new char[n + kDataBlockTrailerSize];
+  Slice contents;
+
+  Status s = file->Read(handle.offset(), n + kDataBlockTrailerSize, &contents, buf);
+  if (!s.ok()) {
+    delete[] buf;
+    return s;
+  }
+  if (contents.size() != n + kDataBlockTrailerSize) {
+    delete[] buf;
+    return Status::Corruption("truncated block read");
+  }
+    unsigned int data_size;
+    //const char* cdata = contents.data();
+    memcpy(&data_size,contents.data() + n + 5,sizeof(unsigned int));
+    std::cout<<"data_size:"<<data_size<<std::endl;
+
+    //int data_size = a;
+    //struct gcm_key_data* gkey = (struct gcm_key_data*)malloc(sizeof(struct gcm_key_data));
+    //struct gcm_context_data* gctx = (struct gcm_context_data*)malloc(sizeof(struct gcm_context_data));
+    struct gcm_key_data gkey;
+    struct gcm_context_data gctx;
+
+    uint8_t ct[data_size], pt[data_size];	// Cipher text and plain text
+    //uint8_t *ct = new uint8_t[data_size];
+    //uint8_t *pt = new uint8_t[data_size];
+    uint8_t iv[IV_SIZE], aad[AAD_SIZE], key[KEY_SIZE];	// Key and authentication data
+    uint8_t tag2[TAG_SIZE];	// Authentication tags for encode and decode
+    memset(key, 0, KEY_SIZE);
+    memset(iv, 0, IV_SIZE);
+    memset(aad, 0, AAD_SIZE);
+
+    memcpy(ct,contents.data(),data_size);
+    //contents.remove_prefix(data_size);
+
+    unsigned int re_size = (unsigned int)n - data_size;
+    std::cout<<"re_size:"<<re_size<<std::endl;
+
+    uint8_t info[re_size];
+    memcpy(info,contents.data() + data_size, re_size);
+
+
+
+
+
+
+
+    aes_gcm_pre_256(key, &gkey);
+    aes_gcm_dec_256(&gkey, &gctx, pt, ct, data_size, iv, aad, AAD_SIZE, tag2, TAG_SIZE);
+    p.reserve(4200);
+    p = std::string( reinterpret_cast<char const*>(pt),data_size);
+    //std::cout<<p<<std::endl;
+    i = std::string( reinterpret_cast<char const*>(info),re_size);
+    p.append(i);
+
+    //*str = p;
+    //static std::string u = std::string(p);
+    Slice plain(p);
+
+
+
+
+    // Check the crc of the type and the block contents
+    const char* data = plain.data();
+
+
+  //const char* data = contents.data();  // Pointer to where Read put the data
+  if (options.verify_checksums) {
+
+    const uint32_t crc = crc32c::Unmask(DecodeFixed32(data + n + 1));
+    const uint32_t actual = crc32c::Value(data, n + 1);
+    if (actual != crc) {
+      delete[] buf;
+      s = Status::Corruption("block checksum mismatch");
+      return s;
+    }
+  }
+
+  switch (data[n]) {
+    case kNoCompression:
+      //if (data != buf) {
+
+        // File implementation gave us pointer to some other data.
+        // Use it directly under the assumption that it will be live
+        // while the file is open.
+
+        delete[] buf;
+        result->data = Slice(data, n);
+        //std::cout<<"n:"<<n<<std::endl;
+        result->heap_allocated = false;
+        result->cachable = false;  // Do not double-cache
+      /*} else {
+        std::cout<<"cache"<<std::endl;
+        result->data = Slice(buf, n);
+        result->heap_allocated = true;
+        result->cachable = true;
+      }*/
+
+      // Ok
+      break;
+    case kSnappyCompression: {
+      size_t ulength = 0;
+      if (!port::Snappy_GetUncompressedLength(data, n, &ulength)) {
+        delete[] buf;
+        return Status::Corruption("corrupted compressed block contents");
+      }
+      char* ubuf = new char[ulength];
+      if (!port::Snappy_Uncompress(data, n, ubuf)) {
+        delete[] buf;
+        delete[] ubuf;
+        return Status::Corruption("corrupted compressed block contents");
+      }
+      delete[] buf;
+      result->data = Slice(ubuf, ulength);
+      result->heap_allocated = true;
+      result->cachable = true;
+      break;
+    }
+    default:
+      delete[] buf;
+      return Status::Corruption("bad block type");
+  }
+  //delete(ct);
+  //delete(pt);
+  //free(gkey);
+  //free(gctx);
+  return Status::OK();
+}
+
+Status ReadIndexBlock(RandomAccessFile* file, const ReadOptions& options,
+                 const BlockHandle& handle, BlockContents* result) {
+  result->data = Slice();
+  result->cachable = false;
+  result->heap_allocated = false;
+
+  // Read the block contents as well as the type/crc footer.
+  // See table_builder.cc for the code that built this structure.
+  size_t n = static_cast<size_t>(handle.size());
   char* buf = new char[n + kBlockTrailerSize];
   Slice contents;
   Status s = file->Read(handle.offset(), n + kBlockTrailerSize, &contents, buf);
@@ -82,8 +234,8 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
     return Status::Corruption("truncated block read");
   }
 
-  // Check the crc of the type and the block contents
   const char* data = contents.data();  // Pointer to where Read put the data
+
   if (options.verify_checksums) {
     const uint32_t crc = crc32c::Unmask(DecodeFixed32(data + n + 1));
     const uint32_t actual = crc32c::Value(data, n + 1);
@@ -97,6 +249,7 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
   switch (data[n]) {
     case kNoCompression:
       if (data != buf) {
+
         // File implementation gave us pointer to some other data.
         // Use it directly under the assumption that it will be live
         // while the file is open.

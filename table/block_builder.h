@@ -10,6 +10,9 @@
 #include <vector>
 
 #include "leveldb/slice.h"
+#include <string.h>
+
+#include <string>
 
 namespace leveldb {
 
@@ -33,7 +36,8 @@ class BlockBuilder {
   // block contents.  The returned slice will remain valid for the
   // lifetime of this builder or until Reset() is called.
   Slice Finish();
-
+  Slice ReturnContent();
+  std::string ReturnRestartsInfo();
   // Returns an estimate of the current (uncompressed) size of the block
   // we are building.
   size_t CurrentSizeEstimate() const;
@@ -48,7 +52,7 @@ class BlockBuilder {
   int counter_;                     // Number of entries emitted since restart
   bool finished_;                   // Has Finish() been called?
   std::string last_key_;
-};
+ };
 
 }  // namespace leveldb
 

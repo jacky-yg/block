@@ -1,0 +1,14 @@
+cmake imported library
+1. 在 include path 部分, 用 cmake 的 include_directories() 加入 
+set(HOME_INC_DIR "/home/xxx/include") 
+include_directories(BEFORE ${HOME_INC_DIR})
+
+
+2. 在 library path 部分, 用 cmake 的 ADD_LIBRARY()  設定 tag, 
+用 SET_TARGET_PROPERTIES() 設定  path, 最後再用 target_link_libraries() 加入.
+
+ADD_LIBRARY(b_lib SHARED IMPORTED)
+SET_TARGET_PROPERTIES(b_lib PROPERTIES
+    IMPORTED_LOCATION /home/xxx/lib/libb.so) 
+target_link_libraries(ProjectB.exe b_lib)
+

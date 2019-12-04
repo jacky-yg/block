@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include <algorithm>
-
+#include <iostream>
 #include "db/filename.h"
 #include "db/log_reader.h"
 #include "db/log_writer.h"
@@ -1234,6 +1234,7 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
       }
     }
   }
+  std::cout<<"num:"<<num<<",space:"<<std::endl;
   assert(num <= space);
   Iterator* result = NewMergingIterator(&icmp_, list, num);
   delete[] list;

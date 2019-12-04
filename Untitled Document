@@ -1,0 +1,37 @@
+  int data_size = 58;
+  struct gcm_key_data gkey;
+  struct gcm_context_data gctx;
+
+  uint8_t ct[data_size], pt[data_size], info[12];	// Cipher text and plain text
+  uint8_t iv[IV_SIZE], aad[AAD_SIZE], key[KEY_SIZE];	// Key and authentication data
+  uint8_t tag1[TAG_SIZE], tag2[TAG_SIZE];	// Authentication tags for encode and decode
+
+  memcpy(ct,contents.data(),data_size);
+  contents.remove_prefix(58);
+  memcpy(info,contents.data(),12);
+  std::cout<<contents.size();
+  for(int i=0; i<12; i++)
+  	  std::cout<<info[i];
+
+
+  memset(key, 0, KEY_SIZE);
+  memset(iv, 0, IV_SIZE);
+  memset(aad, 0, AAD_SIZE);
+
+
+  aes_gcm_pre_256(key, &gkey);
+  aes_gcm_dec_256(&gkey, &gctx, pt, ct, data_size, iv, aad, AAD_SIZE, tag2, TAG_SIZE);
+  for(int i=0; i<data_size; i++)
+	  std::cout<<pt[i];
+  std::cout<<"\n";
+  std::string p( reinterpret_cast<char const*>(pt),data_size);
+  std::string i( reinterpret_cast<char const*>(info),12);
+  p.append(i);
+  std::cout<<p<<std::endl;
+  Slice plain(p);
+  std::cout<<"plain:"<<plain.size()<<std::endl;
+  std::cout<<"plain:"<<plain.ToString()<<std::endl;
+  delete[] buf;
+  // Check the crc of the type and the block contents
+  const char* data = plain.data();
+  //const char* data = contents.data();  // Pointer to where Read put the data

@@ -3,7 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "db/db_impl.h"
-
+#include <iostream>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -886,6 +886,7 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
 }
 
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
+  std::cout<<"DoCompactionWork"<<std::endl;
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
 
@@ -904,6 +905,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   }
 
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
+  if(!input->Valid())
+	  std::cout<<"null!!"<<std::endl;
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
@@ -995,7 +998,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
       compact->current_output()->largest.DecodeFrom(key);
       compact->builder->Add(key, input->value());
-
+      std::cout<<"key"<<key.ToString()<<std::endl;
       // Close output file if it is big enough
       if (compact->builder->FileSize() >=
           compact->compaction->MaxOutputFileSize()) {

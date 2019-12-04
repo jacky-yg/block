@@ -15,6 +15,20 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+#include <iostream>
+#include <stdint.h>
+#include <string.h>
+#include "aes_gcm.h"
+
+
+#define TXT_SIZE  8
+#define AAD_SIZE 32
+#define TAG_SIZE 16		/* Valid values are 16, 12, or 8 */
+#define KEY_SIZE GCM_256_KEY_LEN
+#define IV_SIZE  GCM_IV_DATA_LEN
+
+static int i=0;
+static int j=0;
 
 namespace leveldb {
 
@@ -95,6 +109,10 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
+  /*std::cout<<"num_entries:"<<r->num_entries<<std::endl;
+  std::cout<<"current key:"<<key.ToString()<<std::endl;
+  std::cout<<"last key:"<<r->last_key<<std::endl;*/
+  //2019/11/27
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
@@ -138,7 +156,7 @@ void TableBuilder::Flush() {
   }
 }
 
-void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
+void TableBuilder::WriteMetaBlock(BlockBuilder* block, BlockHandle* handle) {
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
   //    type: uint8
@@ -174,6 +192,95 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   block->Reset();
 }
 
+
+
+void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
+  // File format contains a sequence of blocks where each block has:
+  //    block_data: uint8[n]
+  //    type: uint8
+  //    crc: uint32
+  assert(ok());
+  Rep* r = rep_;
+  Slice raw = block->ReturnContent(); //just return buffer content without restart information
+  //raw = block->Finish();
+  Slice block_contents;
+  CompressionType type = r->options.compression;
+  // TODO(postrelease): Support more compression options: zlib?
+  switch (type) {
+    case kNoCompression:
+      block_contents = raw;
+      break;
+
+    case kSnappyCompression: {
+      std::string* compressed = &r->compressed_output;
+      if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
+          compressed->size() < raw.size() - (raw.size() / 8u)) {
+        block_contents = *compressed;
+      } else {
+        // Snappy not supported, or compressed less than 12.5%, so just
+        // store uncompressed form
+        block_contents = raw;
+        type = kNoCompression;
+      }
+      break;
+    }
+  }
+
+  unsigned int bsize = block_contents.size();
+  struct gcm_key_data gkey;
+  struct gcm_context_data gctx;
+
+  uint8_t ct[bsize];
+  uint8_t pt[bsize];	// Cipher text and plain text
+  //uint8_t *pt2 = new uint8_t[bsize];
+  uint8_t iv[IV_SIZE], aad[AAD_SIZE], key[KEY_SIZE];	// Key and authentication data
+  uint8_t tag1[TAG_SIZE], tag2[TAG_SIZE];	// Authentication tags for encode and decode
+
+
+
+  memcpy(pt,block_contents.data(),bsize);
+  //int length = strlen((char*)pt);
+  //std::cout<<"bsize:"<<bsize<<" string length:"<<length<<std::endl;
+  //std::cout<<block_contents.ToString()<<std::endl;
+
+ /* if(memcmp(pt,block_contents.data(),bsize)==0)
+	  std::cout<<"equal!!"<<std::endl;*/
+
+  memset(key, 0, KEY_SIZE);
+  memset(iv, 0, IV_SIZE);
+  memset(aad, 0, AAD_SIZE);
+
+  aes_gcm_pre_256(key, &gkey);
+  aes_gcm_enc_256(&gkey, &gctx, ct, pt, bsize, iv, aad, AAD_SIZE, tag1, TAG_SIZE);
+  //aes_gcm_dec_256(&gkey, &gctx, pt2, ct, bsize, iv, aad, AAD_SIZE, tag2, TAG_SIZE);
+
+  /*if(memcmp(tag1, tag2, TAG_SIZE)==0)
+	  std::cout<<"equal2!!"<<std::endl;*/
+
+  //write the data after decode
+  /*std::string p( reinterpret_cast<char const*>(pt2),bsize);
+  std::string rawp = block->ReturnRestartsInfo();
+  p.append(rawp);
+  Slice chiper(p);
+  std::cout<<"after add info:"<<p.size()<<std::endl;*/
+  //write the data after encode
+  std::string c( reinterpret_cast<char const*>(ct),bsize) ;
+  std::string rawc = block->ReturnRestartsInfo();
+
+
+  c.append(rawc);
+  Slice chiper(c);
+
+
+  std::cout<<"bsize:"<<bsize<<std::endl;
+  WriteRawDataBlock(chiper, type, handle, bsize);
+  //std::cout<<block_contents.ToString()<<std::endl;
+  r->compressed_output.clear();
+  block->Reset();
+  //delete(pt);
+  //delete(&bsize);
+}
+
 void TableBuilder::WriteRawBlock(const Slice& block_contents,
                                  CompressionType type, BlockHandle* handle) {
   Rep* r = rep_;
@@ -187,9 +294,35 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
     crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer + 1, crc32c::Mask(crc));
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
+
     if (r->status.ok()) {
       r->offset += block_contents.size() + kBlockTrailerSize;
     }
+  }
+}
+
+void TableBuilder::WriteRawDataBlock(const Slice& block_contents,
+                                 CompressionType type, BlockHandle* handle, unsigned int size) {
+
+  Rep* r = rep_;
+  handle->set_offset(r->offset);
+  handle->set_size(block_contents.size());
+  r->status = r->file->Append(block_contents);
+  if (r->status.ok()) {
+    char trailer[kDataBlockTrailerSize];
+    trailer[0] = type;
+    uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
+    crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
+    EncodeFixed32(trailer + 1, crc32c::Mask(crc));
+    //std::cout<<"size1:"<<size<<",sizeof(int):"<<sizeof(unsigned int)<<std::endl;
+    memcpy(&trailer[5],&size,sizeof(unsigned int));
+    r->status = r->file->Append(Slice(trailer, kDataBlockTrailerSize));
+
+
+    if (r->status.ok()) {
+      r->offset += block_contents.size() + kDataBlockTrailerSize;
+    }
+
   }
 }
 
@@ -222,7 +355,7 @@ Status TableBuilder::Finish() {
     }
 
     // TODO(postrelease): Add stats and other meta blocks
-    WriteBlock(&meta_index_block, &metaindex_block_handle);
+    WriteMetaBlock(&meta_index_block, &metaindex_block_handle);
   }
 
   // Write index block
@@ -234,7 +367,7 @@ Status TableBuilder::Finish() {
       r->index_block.Add(r->last_key, Slice(handle_encoding));
       r->pending_index_entry = false;
     }
-    WriteBlock(&r->index_block, &index_block_handle);
+    WriteMetaBlock(&r->index_block, &index_block_handle);
   }
 
   // Write footer

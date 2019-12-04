@@ -12,6 +12,10 @@
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
 #include "leveldb/table_builder.h"
+#include <iostream>
+#include "table/two_level_iterator.h"
+#include "leveldb/options.h"
+#include "leveldb/comparator.h"
 
 namespace leveldb {
 
@@ -78,6 +82,8 @@ static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull;
 
 // 1-byte type + 32-bit crc
 static const size_t kBlockTrailerSize = 5;
+// 1-byte type + 32-bit crc + data length(unsigned int)
+static const size_t kDataBlockTrailerSize = 9;
 
 struct BlockContents {
   Slice data;           // Actual contents of data
@@ -90,6 +96,8 @@ struct BlockContents {
 Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
                  const BlockHandle& handle, BlockContents* result);
 
+Status ReadIndexBlock(RandomAccessFile* file, const ReadOptions& options,
+                 const BlockHandle& handle, BlockContents* result);
 // Implementation details follow.  Clients should ignore,
 
 inline BlockHandle::BlockHandle()

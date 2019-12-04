@@ -63,6 +63,7 @@ class LEVELDB_EXPORT Table {
   struct Rep;
 
   static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
+  static Iterator* IndexBlockReader(void*, const ReadOptions&, const Slice&);
 
   explicit Table(Rep* rep) : rep_(rep) {}
 
