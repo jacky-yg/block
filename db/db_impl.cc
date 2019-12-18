@@ -918,6 +918,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   bool has_current_user_key = false;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
   while (input->Valid() && !shutting_down_.load(std::memory_order_acquire)) {
+	  std::cout<<"valid"<<std::endl;
     // Prioritize immutable compaction work
     if (has_imm_.load(std::memory_order_relaxed)) {
       const uint64_t imm_start = env_->NowMicros();
@@ -959,6 +960,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
       if (last_sequence_for_key <= compact->smallest_snapshot) {
         // Hidden by an newer entry for same user key
+        std::cout<<"drop"<<std::endl;
         drop = true;  // (A)
       } else if (ikey.type == kTypeDeletion &&
                  ikey.sequence <= compact->smallest_snapshot &&
@@ -970,6 +972,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         //     smaller sequence numbers will be dropped in the next
         //     few iterations of this loop (by rule (A) above).
         // Therefore this deletion marker is obsolete and can be dropped.
+    	std::cout<<"drop2"<<std::endl;
         drop = true;
       }
 

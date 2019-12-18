@@ -21,7 +21,7 @@
 
 namespace leveldb {
 
-std::string str;
+//std::string str;
 
 struct Table::Rep {
   ~Rep() {
@@ -185,7 +185,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
         block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
       } else {
         s = ReadBlock(table->rep_->file, options, handle, &contents);
-        //std::cout<<contents.data.ToString()<<std::endl;
+        std::cout<<contents.data.ToString()<<std::endl;
         if (s.ok()) {
 
           block = new Block(contents);

@@ -1234,7 +1234,7 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
       }
     }
   }
-  std::cout<<"num:"<<num<<",space:"<<std::endl;
+  //std::cout<<"num:"<<num<<",space:"<<std::endl;
   assert(num <= space);
   Iterator* result = NewMergingIterator(&icmp_, list, num);
   delete[] list;

@@ -141,6 +141,7 @@ class Block::Iter : public Iterator {
   }
 
   void Next() override {
+	std::cout<<"next"<<std::endl;
     assert(Valid());
     ParseNextKey();
   }
@@ -207,6 +208,7 @@ class Block::Iter : public Iterator {
   }
 
   void SeekToFirst() override {
+    std::cout<<"seektofirst"<<std::endl;
     SeekToRestartPoint(0);
     ParseNextKey();
   }
@@ -241,8 +243,12 @@ class Block::Iter : public Iterator {
     // Decode next entry
     uint32_t shared, non_shared, value_length;
     p = DecodeEntry(p, limit, &shared, &non_shared, &value_length);
+    std::cout<<"key_.size():"<<key_.size()<<",shared:"<<shared<<std::endl;
     if (p == nullptr || key_.size() < shared) {
-      std::cout<<"error"<<std::endl;
+      if(p == nullptr)
+    	  std::cout<<"p == nullptr"<<std::endl;
+      //if(key_.size() < shared)
+    	  //std::cout<<"key_.size():"<<key_.size()<<",shared:"<<shared<<std::endl;
       CorruptionError();
       return false;
     } else {

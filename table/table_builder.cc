@@ -15,6 +15,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+
 #include <iostream>
 #include <stdint.h>
 #include <string.h>
@@ -27,10 +28,11 @@
 #define KEY_SIZE GCM_256_KEY_LEN
 #define IV_SIZE  GCM_IV_DATA_LEN
 
-static int i=0;
-static int j=0;
+
 
 namespace leveldb {
+std::string c;
+std::string rawc;
 
 struct TableBuilder::Rep {
   Rep(const Options& opt, WritableFile* f)
@@ -113,6 +115,9 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   std::cout<<"current key:"<<key.ToString()<<std::endl;
   std::cout<<"last key:"<<r->last_key<<std::endl;*/
   //2019/11/27
+  //std::cout<<"sizeof(size_t):"<<sizeof(size_t)<<std::endl;
+  if (r->num_entries == 0)
+	  std::cout<<"num_entries == 0"<<std::endl;
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
@@ -226,7 +231,7 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
     }
   }
 
-  unsigned int bsize = block_contents.size();
+  size_t bsize = block_contents.size();
   struct gcm_key_data gkey;
   struct gcm_context_data gctx;
 
@@ -234,7 +239,7 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   uint8_t pt[bsize];	// Cipher text and plain text
   //uint8_t *pt2 = new uint8_t[bsize];
   uint8_t iv[IV_SIZE], aad[AAD_SIZE], key[KEY_SIZE];	// Key and authentication data
-  uint8_t tag1[TAG_SIZE], tag2[TAG_SIZE];	// Authentication tags for encode and decode
+  uint8_t tag1[TAG_SIZE];	// Authentication tags for encode and decode
 
 
 
@@ -264,16 +269,18 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   Slice chiper(p);
   std::cout<<"after add info:"<<p.size()<<std::endl;*/
   //write the data after encode
-  std::string c( reinterpret_cast<char const*>(ct),bsize) ;
-  std::string rawc = block->ReturnRestartsInfo();
+  c=std::string( reinterpret_cast<char const*>(ct),bsize) ;
+  rawc = block->ReturnRestartsInfo();
 
 
   c.append(rawc);
+  //const std::string c2 =c;
   Slice chiper(c);
 
 
   std::cout<<"bsize:"<<bsize<<std::endl;
   WriteRawDataBlock(chiper, type, handle, bsize);
+  block_contents.clear();
   //std::cout<<block_contents.ToString()<<std::endl;
   r->compressed_output.clear();
   block->Reset();
@@ -302,7 +309,7 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
 }
 
 void TableBuilder::WriteRawDataBlock(const Slice& block_contents,
-                                 CompressionType type, BlockHandle* handle, unsigned int size) {
+                                 CompressionType type, BlockHandle* handle, size_t size) {
 
   Rep* r = rep_;
   handle->set_offset(r->offset);
@@ -315,7 +322,7 @@ void TableBuilder::WriteRawDataBlock(const Slice& block_contents,
     crc = crc32c::Extend(crc, trailer, 1);  // Extend crc to cover block type
     EncodeFixed32(trailer + 1, crc32c::Mask(crc));
     //std::cout<<"size1:"<<size<<",sizeof(int):"<<sizeof(unsigned int)<<std::endl;
-    memcpy(&trailer[5],&size,sizeof(unsigned int));
+    memcpy(&trailer[5],&size,sizeof(size_t));
     r->status = r->file->Append(Slice(trailer, kDataBlockTrailerSize));
 
 

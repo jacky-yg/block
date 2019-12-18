@@ -100,8 +100,11 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   if (counter_ < options_->block_restart_interval) {
     // See how much sharing to do with previous string
     const size_t min_length = std::min(last_key_piece.size(), key.size());
+    //std::cout<<"last_key_piece.size():"<<last_key_piece.size()<<",key.size():"<<key.size()<<std::endl;
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
+
       shared++;
+      //std::cout<<"shared:"<<shared<<std::endl;
     }
   } else {
     // Restart compression

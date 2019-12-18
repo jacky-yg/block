@@ -7,6 +7,7 @@
 
 #include "leveldb/iterator.h"
 #include "leveldb/slice.h"
+#include <iostream>
 
 namespace leveldb {
 
@@ -28,6 +29,7 @@ class IteratorWrapper {
     iter_ = iter;
     if (iter_ == nullptr) {
       valid_ = false;
+      std::cout<<"iter null"<<std::endl;
     } else {
       Update();
     }

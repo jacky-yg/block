@@ -21,9 +21,12 @@
 #define KEY_SIZE GCM_256_KEY_LEN
 #define IV_SIZE  GCM_IV_DATA_LEN
 
-std::string p;
+std::string plaintext;
 std::string i;
+static int amounts;
 namespace leveldb {
+
+
 
 
 void BlockHandle::EncodeTo(std::string* dst) const {
@@ -96,9 +99,9 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
     delete[] buf;
     return Status::Corruption("truncated block read");
   }
-    unsigned int data_size;
+    size_t data_size;
     //const char* cdata = contents.data();
-    memcpy(&data_size,contents.data() + n + 5,sizeof(unsigned int));
+    memcpy(&data_size,contents.data() + n + 5,sizeof(size_t));
     std::cout<<"data_size:"<<data_size<<std::endl;
 
     //int data_size = a;
@@ -119,11 +122,10 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
     memcpy(ct,contents.data(),data_size);
     //contents.remove_prefix(data_size);
 
-    unsigned int re_size = (unsigned int)n - data_size;
+    size_t re_size = n - data_size;
     std::cout<<"re_size:"<<re_size<<std::endl;
 
-    uint8_t info[re_size];
-    memcpy(info,contents.data() + data_size, re_size);
+
 
 
 
@@ -133,16 +135,29 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
 
     aes_gcm_pre_256(key, &gkey);
     aes_gcm_dec_256(&gkey, &gctx, pt, ct, data_size, iv, aad, AAD_SIZE, tag2, TAG_SIZE);
-    p.reserve(4200);
-    p = std::string( reinterpret_cast<char const*>(pt),data_size);
+    uint8_t info[re_size];
+
+    //memcpy(&info,pt,data_size);
+    memcpy(info,contents.data() + data_size, re_size);
+    //contents.clear();
+    plaintext.reserve(n);
+    plaintext = std::string( reinterpret_cast<char const*>(pt),data_size);
+    //std::string *string2 = (std::string *)malloc(n*sizeof())
     //std::cout<<p<<std::endl;
     i = std::string( reinterpret_cast<char const*>(info),re_size);
-    p.append(i);
+    //onst char* p = (const char *)info;
+    //memcpy(const_cast<unsigned char *>(p),reinterpret_cast<char *>(pt),data_size);
+    //memcpy(const_cast<unsigned char *>(p+data_size),reinterpret_cast<char *>(info),re_size);
+
+    plaintext.append(i);
+
+    std::string *plaintext2 = new std::string(plaintext);
+    //const char *str = (const char *)malloc(n*sizeof(char));
 
     //*str = p;
     //static std::string u = std::string(p);
-    Slice plain(p);
-
+    Slice plain(*plaintext2);
+    //std::cout<<"plaintext:"<<plaintext<<std::endl;
 
 
 

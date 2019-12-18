@@ -17,17 +17,26 @@
 #include "leveldb/options.h"
 #include "leveldb/comparator.h"
 
+
+
+
+
 namespace leveldb {
+
 
 class Block;
 class RandomAccessFile;
 struct ReadOptions;
+
+
+
 
 // BlockHandle is a pointer to the extent of a file that stores a data
 // block or a meta block.
 class BlockHandle {
  public:
   // Maximum encoding length of a BlockHandle
+
   enum { kMaxEncodedLength = 10 + 10 };
 
   BlockHandle();
@@ -46,6 +55,7 @@ class BlockHandle {
  private:
   uint64_t offset_;
   uint64_t size_;
+
 };
 
 // Footer encapsulates the fixed information stored at the tail
@@ -83,7 +93,9 @@ static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull;
 // 1-byte type + 32-bit crc
 static const size_t kBlockTrailerSize = 5;
 // 1-byte type + 32-bit crc + data length(unsigned int)
-static const size_t kDataBlockTrailerSize = 9;
+static const size_t kDataBlockTrailerSize = 13;
+
+
 
 struct BlockContents {
   Slice data;           // Actual contents of data
