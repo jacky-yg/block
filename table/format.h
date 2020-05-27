@@ -107,6 +107,13 @@ struct BlockContents {
 // return non-OK.  On success fill *result and return OK.
 Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
                  const BlockHandle& handle, BlockContents* result);
+Status ReadTheBlock(RandomAccessFile* file, const ReadOptions& options,
+                 const BlockHandle& handle, BlockContents* result);
+Status ReadTheInternalBlock(RandomAccessFile* file, const ReadOptions& options,
+                 const BlockHandle& handle, BlockContents* result,uint8_t* tkey);
+
+Status ReadTheCompactBlock(RandomAccessFile* file, const ReadOptions& options,
+                 const BlockHandle& handle, BlockContents* result,uint8_t* tkey);
 
 Status ReadIndexBlock(RandomAccessFile* file, const ReadOptions& options,
                  const BlockHandle& handle, BlockContents* result);

@@ -18,17 +18,24 @@
 #include "leveldb/export.h"
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
+#include "aes_gcm.h"
+
+#define KEY_SIZE GCM_256_KEY_LEN
 
 namespace leveldb {
 
 class LEVELDB_EXPORT Iterator {
  public:
+
   Iterator();
+  uint8_t ekey[KEY_SIZE];
 
   Iterator(const Iterator&) = delete;
   Iterator& operator=(const Iterator&) = delete;
 
   virtual ~Iterator();
+
+
 
   // An iterator is either positioned at a key/value pair, or
   // not valid.  This method returns true iff the iterator is valid.
@@ -46,6 +53,13 @@ class LEVELDB_EXPORT Iterator {
   // The iterator is Valid() after this call iff the source contains
   // an entry that comes at or past target.
   virtual void Seek(const Slice& target) = 0;
+
+
+  virtual void MySeekToFirst(uint8_t* key){}
+  virtual void MySeekToLast(uint8_t* key){}
+  virtual void MySeek(const Slice& target,uint8_t* key){}
+
+
 
   // Moves to the next entry in the source.  After this call, Valid() is
   // true iff the iterator was not positioned at the last entry in the source.
@@ -91,6 +105,7 @@ class LEVELDB_EXPORT Iterator {
       assert(function != nullptr);
       (*function)(arg1, arg2);
     }
+
 
     // The head node is used if the function pointer is not null.
     CleanupFunction function;

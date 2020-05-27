@@ -531,8 +531,10 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
     if (base != nullptr) {
       level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
     }
-    edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
+    edit->GetKey(meta.key); //20200408
+    edit->AddTheFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
+
   }
 
   CompactionStats stats;
@@ -727,10 +729,17 @@ void DBImpl::BackgroundCompaction() {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
     // Move file to next level
+
     assert(c->num_input_files(0) == 1);
     FileMetaData* f = c->input(0, 0);
+    uint8_t key[KEY_SIZE];
+    memcpy(key,f->key,KEY_SIZE); //20200425
+    for(int i=0;i<KEY_SIZE;i++)
+    	std::cout<<*(c->edit()->CompactKey()+i);
     c->edit()->DeleteFile(c->level(), f->number);
-    c->edit()->AddFile(c->level() + 1, f->number, f->file_size, f->smallest,
+    std::cout<<"bgcompaction:"<<std::endl;
+    c->edit()->GetKey(key);
+    c->edit()->AddTheFile(c->level() + 1, f->number, f->file_size, f->smallest,
                        f->largest);
     status = versions_->LogAndApply(c->edit(), &mutex_);
     if (!status.ok()) {
@@ -856,6 +865,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     Iterator* iter =
         table_cache_->NewIterator(ReadOptions(), output_number, current_bytes);
     s = iter->status();
+
     delete iter;
     if (s.ok()) {
       Log(options_.info_log, "Generated table #%llu@%d: %lld keys, %lld bytes",
@@ -886,8 +896,9 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
 }
 
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
-  std::cout<<"DoCompactionWork"<<std::endl;
-  const uint64_t start_micros = env_->NowMicros();
+	std::cout<<"docomactionwork()"<<std::endl;
+
+    const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
 
   Log(options_.info_log, "Compacting %d@%d + %d@%d files",
@@ -903,22 +914,27 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   } else {
     compact->smallest_snapshot = snapshots_.oldest()->sequence_number();
   }
+  uint8_t key[KEY_SIZE];
+  Iterator* input = versions_->MakeMyInputIterator(compact->compaction,key);
 
-  Iterator* input = versions_->MakeInputIterator(compact->compaction);
-  if(!input->Valid())
-	  std::cout<<"null!!"<<std::endl;
 
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
+  std::cout<<"\ndb_impl"<<std::endl;
 
-  input->SeekToFirst();
+  for(int i=0; i<KEY_SIZE; i++)
+	std::cout<<*(key+i);
+  std::cout<<""<<std::endl;
+  input->MySeekToFirst(key);
+
   Status status;
   ParsedInternalKey ikey;
   std::string current_user_key;
   bool has_current_user_key = false;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
   while (input->Valid() && !shutting_down_.load(std::memory_order_acquire)) {
-	  std::cout<<"valid"<<std::endl;
+	  //2019
+	  //std::cout<<"valid"<<std::endl;
     // Prioritize immutable compaction work
     if (has_imm_.load(std::memory_order_relaxed)) {
       const uint64_t imm_start = env_->NowMicros();
@@ -960,7 +976,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
       if (last_sequence_for_key <= compact->smallest_snapshot) {
         // Hidden by an newer entry for same user key
-        std::cout<<"drop"<<std::endl;
+        //std::cout<<"drop"<<std::endl;
         drop = true;  // (A)
       } else if (ikey.type == kTypeDeletion &&
                  ikey.sequence <= compact->smallest_snapshot &&
@@ -972,7 +988,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         //     smaller sequence numbers will be dropped in the next
         //     few iterations of this loop (by rule (A) above).
         // Therefore this deletion marker is obsolete and can be dropped.
-    	std::cout<<"drop2"<<std::endl;
+    	//std::cout<<"drop2"<<std::endl;
         drop = true;
       }
 
@@ -1001,7 +1017,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
       compact->current_output()->largest.DecodeFrom(key);
       compact->builder->Add(key, input->value());
-      std::cout<<"key"<<key.ToString()<<std::endl;
+      //2019
+      //std::cout<<"key"<<key.ToString()<<std::endl;
       // Close output file if it is big enough
       if (compact->builder->FileSize() >=
           compact->compaction->MaxOutputFileSize()) {

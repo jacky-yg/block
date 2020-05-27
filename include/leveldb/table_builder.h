@@ -18,6 +18,9 @@
 #include "leveldb/export.h"
 #include "leveldb/options.h"
 #include "leveldb/status.h"
+#include "aes_gcm.h"
+
+#define KEY_SIZE GCM_256_KEY_LEN
 
 namespace leveldb {
 
@@ -32,11 +35,15 @@ class LEVELDB_EXPORT TableBuilder {
   // caller to close the file after calling Finish().
   TableBuilder(const Options& options, WritableFile* file);
 
+  TableBuilder(const Options& options, WritableFile* file, uint8_t* key);
+
   TableBuilder(const TableBuilder&) = delete;
   TableBuilder& operator=(const TableBuilder&) = delete;
 
   // REQUIRES: Either Finish() or Abandon() has been called.
   ~TableBuilder();
+
+  uint8_t key[KEY_SIZE]; //2020/03/04
 
   // Change the options used by this builder.  Note: only some of the
   // option fields can be changed after construction.  If a field is
@@ -79,12 +86,15 @@ class LEVELDB_EXPORT TableBuilder {
   // Finish() call, returns the size of the final generated file.
   uint64_t FileSize() const;
 
+  void GetKey(uint8_t* key); //2020/03/04
+
  private:
   bool ok() const { return status().ok(); }
   void WriteBlock(BlockBuilder* block, BlockHandle* handle);
   void WriteMetaBlock(BlockBuilder* block, BlockHandle* handle);
   void WriteRawDataBlock(const Slice& data, CompressionType, BlockHandle* handle, size_t size);
   void WriteRawBlock(const Slice& data, CompressionType, BlockHandle* handle);
+
   struct Rep;
   Rep* rep_;
 };

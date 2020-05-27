@@ -169,6 +169,9 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   BlockHandle handle;
   Slice input = index_value;
   Status s = handle.DecodeFrom(&input);
+  /*std::cout<<"compact key"<<std::endl;
+  for(int i=0;i<KEY_SIZE;i++)
+	  std::cout<*(key+i);*/
   // We intentionally allow extra stuff in index_value so that we
   // can add more features in the future.
 
@@ -185,10 +188,12 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
         block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
       } else {
         s = ReadBlock(table->rep_->file, options, handle, &contents);
-        std::cout<<contents.data.ToString()<<std::endl;
+        //2019
+        //std::cout<<contents.data.ToString()<<std::endl;
         if (s.ok()) {
 
           block = new Block(contents);
+
           if (contents.cachable && options.fill_cache) {
             cache_handle = block_cache->Insert(key, block, block->size(),
                                                &DeleteCachedBlock);
@@ -201,6 +206,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
       if (s.ok()) {
 
         block = new Block(contents);
+
       }
     }
   }
@@ -217,7 +223,9 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   } else {
     iter = NewErrorIterator(s);
   }
+
   return iter;
+
 }
 
 
@@ -227,15 +235,234 @@ Iterator* Table::NewIterator(const ReadOptions& options) const {
       &Table::BlockReader, const_cast<Table*>(this), options);
 }
 
+Iterator* Table::MyNewIterator(const ReadOptions& options,uint8_t* key) const{
+  //memcpy(key,tkey.KEY_SIZE);
+  std::cout<<"call iteraror"<<std::endl;
+  for(int i=0; i<KEY_SIZE; i++)
+	  std::cout<<*(key+i);
+  std::cout<<""<<std::endl;
+  return MyNewTwoLevelIterator(
+      rep_->index_block->NewIterator(rep_->options.comparator), const_cast<Table*>(this), options,
+      &Table::TheCompactBlockReader,key);
+}
+
+
+
+
+Iterator* Table::TheBlockReader(void* arg, const ReadOptions& options,
+                             const Slice& index_value) {
+  Table* table = reinterpret_cast<Table*>(arg);
+  Cache* block_cache = table->rep_->options.block_cache;
+  Block* block = nullptr;
+  Cache::Handle* cache_handle = nullptr;
+
+  BlockHandle handle;
+  Slice input = index_value;
+  Status s = handle.DecodeFrom(&input);
+  // We intentionally allow extra stuff in index_value so that we
+  // can add more features in the future.
+
+  if (s.ok()) {
+    BlockContents contents;
+    //std::string str;
+    if (block_cache != nullptr) {
+      char cache_key_buffer[16];
+      EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
+      EncodeFixed64(cache_key_buffer + 8, handle.offset());
+      Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+      cache_handle = block_cache->Lookup(key);
+      if (cache_handle != nullptr) {
+        block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+      } else {
+        s = ReadTheBlock(table->rep_->file, options, handle, &contents);
+        //2019
+        //std::cout<<contents.data.ToString()<<std::endl;
+        if (s.ok()) {
+
+          block = new Block(contents);
+
+          if (contents.cachable && options.fill_cache) {
+            cache_handle = block_cache->Insert(key, block, block->size(),
+                                               &DeleteCachedBlock);
+          }
+        }
+      }
+    } else {
+      s = ReadTheBlock(table->rep_->file, options, handle, &contents);
+      //std::cout<<contents.data.ToString()<<std::endl;
+      if (s.ok()) {
+
+        block = new Block(contents);
+
+      }
+    }
+  }
+
+  Iterator* iter;
+  if (block != nullptr) {
+	//std::cout<<"not null"<<std::endl;
+    iter = block->NewIterator(table->rep_->options.comparator);
+    if (cache_handle == nullptr) {
+      iter->RegisterCleanup(&DeleteBlock, block, nullptr);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
+  } else {
+    iter = NewErrorIterator(s);
+  }
+
+  return iter;
+
+}
+
+Iterator* Table::TheCompactBlockReader(void* arg, const ReadOptions& options,
+                             const Slice& index_value,uint8_t* tkey) {
+  Table* table = reinterpret_cast<Table*>(arg);
+  Cache* block_cache = table->rep_->options.block_cache;
+  Block* block = nullptr;
+  Cache::Handle* cache_handle = nullptr;
+
+  BlockHandle handle;
+  Slice input = index_value;
+  Status s = handle.DecodeFrom(&input);
+  // We intentionally allow extra stuff in index_value so that we
+  // can add more features in the future.
+
+  if (s.ok()) {
+    BlockContents contents;
+    //std::string str;
+    if (block_cache != nullptr) {
+      char cache_key_buffer[16];
+      EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
+      EncodeFixed64(cache_key_buffer + 8, handle.offset());
+      Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+      cache_handle = block_cache->Lookup(key);
+      if (cache_handle != nullptr) {
+        block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+      } else {
+        s = ReadTheCompactBlock(table->rep_->file, options, handle, &contents,tkey);
+        //2019
+        //std::cout<<contents.data.ToString()<<std::endl;
+        if (s.ok()) {
+
+          block = new Block(contents);
+
+          if (contents.cachable && options.fill_cache) {
+            cache_handle = block_cache->Insert(key, block, block->size(),
+                                               &DeleteCachedBlock);
+          }
+        }
+      }
+    } else {
+      s = ReadTheBlock(table->rep_->file, options, handle, &contents);
+      //std::cout<<contents.data.ToString()<<std::endl;
+      if (s.ok()) {
+
+        block = new Block(contents);
+
+      }
+    }
+  }
+
+  Iterator* iter;
+  if (block != nullptr) {
+	//std::cout<<"not null"<<std::endl;
+    iter = block->NewIterator(table->rep_->options.comparator);
+    if (cache_handle == nullptr) {
+      iter->RegisterCleanup(&DeleteBlock, block, nullptr);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
+  } else {
+    iter = NewErrorIterator(s);
+  }
+
+  return iter;
+
+}
+
+
+Iterator* Table::TheInternalBlockReader(void* arg, const ReadOptions& options,
+                             const Slice& index_value,uint8_t* tkey) {
+  Table* table = reinterpret_cast<Table*>(arg);
+  Cache* block_cache = table->rep_->options.block_cache;
+  Block* block = nullptr;
+  Cache::Handle* cache_handle = nullptr;
+
+  BlockHandle handle;
+  Slice input = index_value;
+  Status s = handle.DecodeFrom(&input);
+  // We intentionally allow extra stuff in index_value so that we
+  // can add more features in the future.
+
+  if (s.ok()) {
+    BlockContents contents;
+    //std::string str;
+    if (block_cache != nullptr) {
+      char cache_key_buffer[16];
+      EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
+      EncodeFixed64(cache_key_buffer + 8, handle.offset());
+      Slice key(cache_key_buffer, sizeof(cache_key_buffer));
+      cache_handle = block_cache->Lookup(key);
+      if (cache_handle != nullptr) {
+        block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+      } else {
+        s = ReadTheInternalBlock(table->rep_->file, options, handle, &contents,tkey);
+        //2019
+        //std::cout<<contents.data.ToString()<<std::endl;
+        if (s.ok()) {
+
+          block = new Block(contents);
+
+          if (contents.cachable && options.fill_cache) {
+            cache_handle = block_cache->Insert(key, block, block->size(),
+                                               &DeleteCachedBlock);
+          }
+        }
+      }
+    } else {
+      s = ReadTheBlock(table->rep_->file, options, handle, &contents);
+      //std::cout<<contents.data.ToString()<<std::endl;
+      if (s.ok()) {
+
+        block = new Block(contents);
+
+      }
+    }
+  }
+
+  Iterator* iter;
+  if (block != nullptr) {
+	//std::cout<<"not null"<<std::endl;
+    iter = block->NewIterator(table->rep_->options.comparator);
+    if (cache_handle == nullptr) {
+      iter->RegisterCleanup(&DeleteBlock, block, nullptr);
+    } else {
+      iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
+    }
+  } else {
+    iter = NewErrorIterator(s);
+  }
+
+  return iter;
+
+}
+
+
+
+
+
 
 Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
                           void (*handle_result)(void*, const Slice&,
-                                                const Slice&)) {
+                                                const Slice&),uint8_t* key) {
   Status s;
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
-  std::cout<<k.ToString()<<std::endl;
+  //2019
+  //std::cout<<k.ToString()<<std::endl;
   iiter->Seek(k);
-  std::cout << iiter->key().ToString() << "->" << iiter->value().ToString() << std::endl;
+  //2019
+  //std::cout << iiter->key().ToString() << "->" << iiter->value().ToString() << std::endl;
   if (iiter->Valid()) {
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
@@ -244,9 +471,10 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
     } else {
-      Iterator* block_iter = BlockReader(this, options, iiter->value());
+      Iterator* block_iter = TheInternalBlockReader(this, options, iiter->value(),key);
       block_iter->Seek(k);
-      std::cout<<"k:"<<k.ToString()<<"iter.key:"<<block_iter->key().ToString()<<std::endl;
+      //2019
+      //std::cout<<"k:"<<k.ToString()<<"iter.key:"<<block_iter->key().ToString()<<std::endl;
       /*block_iter->Next();
       std::cout<<"k:"<<k.ToString()<<"iter.key:"<<block_iter->key().ToString()<<std::endl;*/
       if (block_iter->Valid()) {

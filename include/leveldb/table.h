@@ -9,6 +9,9 @@
 
 #include "leveldb/export.h"
 #include "leveldb/iterator.h"
+#include "aes_gcm.h"
+
+#define KEY_SIZE GCM_256_KEY_LEN
 
 namespace leveldb {
 
@@ -40,6 +43,11 @@ class LEVELDB_EXPORT Table {
   static Status Open(const Options& options, RandomAccessFile* file,
                      uint64_t file_size, Table** table);
 
+  void GetKey(uint8_t* tkey)
+  {
+	  memcpy(key,tkey,KEY_SIZE);
+  }
+
   Table(const Table&) = delete;
   Table& operator=(const Table&) = delete;
 
@@ -49,7 +57,8 @@ class LEVELDB_EXPORT Table {
   // The result of NewIterator() is initially invalid (caller must
   // call one of the Seek methods on the iterator before using it).
   Iterator* NewIterator(const ReadOptions&) const;
-
+  Iterator* MyNewIterator(const ReadOptions&,uint8_t* key) const;
+  //Iterator* TheNewIterator(const ReadOptions&) const;
   // Given a key, return an approximate byte offset in the file where
   // the data for that key begins (or would begin if the key were
   // present in the file).  The returned value is in terms of file
@@ -61,8 +70,12 @@ class LEVELDB_EXPORT Table {
  private:
   friend class TableCache;
   struct Rep;
+  uint8_t key[KEY_SIZE];
 
   static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
+  static Iterator* TheBlockReader(void*, const ReadOptions&, const Slice&);
+  static Iterator* TheInternalBlockReader(void*, const ReadOptions&, const Slice&,uint8_t* key);
+  static Iterator* TheCompactBlockReader(void*, const ReadOptions&, const Slice&,uint8_t* key);
   static Iterator* IndexBlockReader(void*, const ReadOptions&, const Slice&);
 
   explicit Table(Rep* rep) : rep_(rep) {}
@@ -72,7 +85,7 @@ class LEVELDB_EXPORT Table {
   // that key is not present.
   Status InternalGet(const ReadOptions&, const Slice& key, void* arg,
                      void (*handle_result)(void* arg, const Slice& k,
-                                           const Slice& v));
+                                           const Slice& v),uint8_t* tkey);
 
   void ReadMeta(const Footer& footer);
   void ReadFilter(const Slice& filter_handle_value);

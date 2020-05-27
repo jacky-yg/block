@@ -7,7 +7,7 @@
 int main() {
     leveldb::SequentialFile* file;
     //MANIFEST files
-    leveldb::Status status = leveldb::Env::Default()->NewSequentialFile("./data/test_table.db/MANIFEST-000004", &file);
+    leveldb::Status status = leveldb::Env::Default()->NewSequentialFile("/tmp/leveldbtest-1000/dbbench/MANIFEST-000002", &file);
     std::cout << status.ToString() << std::endl;
 
     leveldb::log::Reader reader(file, NULL, true/*checksum*/, 0/*initial_offset*/);

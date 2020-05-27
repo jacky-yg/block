@@ -141,7 +141,7 @@ class Block::Iter : public Iterator {
   }
 
   void Next() override {
-	std::cout<<"next"<<std::endl;
+	//std::cout<<"next"<<std::endl;
     assert(Valid());
     ParseNextKey();
   }
@@ -208,7 +208,7 @@ class Block::Iter : public Iterator {
   }
 
   void SeekToFirst() override {
-    std::cout<<"seektofirst"<<std::endl;
+    //std::cout<<"seektofirst"<<std::endl;
     SeekToRestartPoint(0);
     ParseNextKey();
   }
@@ -243,10 +243,12 @@ class Block::Iter : public Iterator {
     // Decode next entry
     uint32_t shared, non_shared, value_length;
     p = DecodeEntry(p, limit, &shared, &non_shared, &value_length);
-    std::cout<<"key_.size():"<<key_.size()<<",shared:"<<shared<<std::endl;
+    //2019
+    //std::cout<<"key_.size():"<<key_.size()<<",shared:"<<shared<<std::endl;
     if (p == nullptr || key_.size() < shared) {
-      if(p == nullptr)
-    	  std::cout<<"p == nullptr"<<std::endl;
+      //2019
+      /*if(p == nullptr)
+    	  std::cout<<"p == nullptr"<<std::endl;*/
       //if(key_.size() < shared)
     	  //std::cout<<"key_.size():"<<key_.size()<<",shared:"<<shared<<std::endl;
       CorruptionError();
@@ -265,7 +267,8 @@ class Block::Iter : public Iterator {
 };
 
 Iterator* Block::NewIterator(const Comparator* comparator) {
-  std::cout<<"block size:"<<size_<<std::endl;
+  //2019
+  //std::cout<<"block size:"<<size_<<std::endl;
   if (size_ < sizeof(uint32_t)) {
     return NewErrorIterator(Status::Corruption("bad block contents"));
   }
@@ -274,7 +277,26 @@ Iterator* Block::NewIterator(const Comparator* comparator) {
 	//std::cout<<"re_error:"<<std::endl;
     return NewEmptyIterator();
   } else {
-	std::cout<<"num_restarts:"<<num_restarts<<std::endl;
+	//2019
+	//std::cout<<"num_restarts:"<<num_restarts<<std::endl;
+    return new Iter(comparator, data_, restart_offset_, num_restarts);
+  }
+}
+
+
+Iterator* Block::MyNewIterator(const Comparator* comparator,uint8_t *key) {
+  //2019
+  //std::cout<<"block size:"<<size_<<std::endl;
+  if (size_ < sizeof(uint32_t)) {
+    return NewErrorIterator(Status::Corruption("bad block contents"));
+  }
+  const uint32_t num_restarts = NumRestarts();
+  if (num_restarts == 0) {
+	//std::cout<<"re_error:"<<std::endl;
+    return NewEmptyIterator();
+  } else {
+	//2019
+	//std::cout<<"num_restarts:"<<num_restarts<<std::endl;
     return new Iter(comparator, data_, restart_offset_, num_restarts);
   }
 }

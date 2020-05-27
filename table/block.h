@@ -27,7 +27,7 @@ class Block {
 
   size_t size() const { return size_; }
   Iterator* NewIterator(const Comparator* comparator);
-
+  Iterator* MyNewIterator(const Comparator* comparator,uint8_t* key);
  private:
   class Iter;
 

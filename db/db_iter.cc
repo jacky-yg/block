@@ -83,6 +83,7 @@ class DBIter : public Iterator {
   void SeekToFirst() override;
   void SeekToLast() override;
 
+
  private:
   void FindNextUserEntry(bool skipping, std::string* skip);
   void FindPrevUserEntry();
@@ -306,6 +307,8 @@ void DBIter::SeekToLast() {
   iter_->SeekToLast();
   FindPrevUserEntry();
 }
+
+
 
 }  // anonymous namespace
 

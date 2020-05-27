@@ -28,6 +28,8 @@
 #define KEY_SIZE GCM_256_KEY_LEN
 #define IV_SIZE  GCM_IV_DATA_LEN
 
+static int count = 1;
+
 
 
 namespace leveldb {
@@ -83,6 +85,21 @@ TableBuilder::TableBuilder(const Options& options, WritableFile* file)
   if (rep_->filter_block != nullptr) {
     rep_->filter_block->StartBlock(0);
   }
+  count++;
+}
+
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint8_t* tkey)
+    : rep_(new Rep(options, file)) {
+  if (rep_->filter_block != nullptr) {
+    rep_->filter_block->StartBlock(0);
+  }
+  std::cout<<"create table!!"<<std::endl;
+  for(int i=0; i<KEY_SIZE; i++)
+  {
+	  std::cout<<*(tkey+i);
+	  memcpy(key,tkey,KEY_SIZE);
+  }
+  count++;
 }
 
 TableBuilder::~TableBuilder() {
@@ -116,8 +133,9 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   std::cout<<"last key:"<<r->last_key<<std::endl;*/
   //2019/11/27
   //std::cout<<"sizeof(size_t):"<<sizeof(size_t)<<std::endl;
-  if (r->num_entries == 0)
-	  std::cout<<"num_entries == 0"<<std::endl;
+  //2019
+  /*if (r->num_entries == 0)
+	  std::cout<<"num_entries == 0"<<std::endl;*/
   if (r->num_entries > 0) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
@@ -138,14 +156,16 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
-
-  const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
+  int j = (count/5)+1;
+  const size_t estimated_block_size = r->data_block.CurrentSizeEstimate(j);
   if (estimated_block_size >= r->options.block_size) {
+
     Flush();
   }
 }
 
 void TableBuilder::Flush() {
+  //std::cout<<"fiush()"<<std::endl;
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
@@ -251,10 +271,26 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
  /* if(memcmp(pt,block_contents.data(),bsize)==0)
 	  std::cout<<"equal!!"<<std::endl;*/
 
-  memset(key, 0, KEY_SIZE);
+  /* 20200407 key generator
+  srand (time(NULL));
+
+        for (int i=0; i<KEY_SIZE; i++)
+        {
+     	   char t,c;
+     	   t = rand() % 26;   // generate a random number
+     	   c = 'a' + t;
+              f.key[i]=c;            // Convert to a character from a-z
+        }
+  */
+
+  //memset(key, 0, KEY_SIZE);
+  memcpy(key,this->key,KEY_SIZE);
+  std::cout<<"\nencrypting"<<std::endl;
+  for(int i=0; i<KEY_SIZE; i++)
+	  std::cout<<*(key+i);
   memset(iv, 0, IV_SIZE);
   memset(aad, 0, AAD_SIZE);
-
+  //GetKey(key);
   aes_gcm_pre_256(key, &gkey);
   aes_gcm_enc_256(&gkey, &gctx, ct, pt, bsize, iv, aad, AAD_SIZE, tag1, TAG_SIZE);
   //aes_gcm_dec_256(&gkey, &gctx, pt2, ct, bsize, iv, aad, AAD_SIZE, tag2, TAG_SIZE);
@@ -277,8 +313,8 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   //const std::string c2 =c;
   Slice chiper(c);
 
-
-  std::cout<<"bsize:"<<bsize<<std::endl;
+  //2019
+  //std::cout<<"bsize:"<<bsize<<std::endl;
   WriteRawDataBlock(chiper, type, handle, bsize);
   block_contents.clear();
   //std::cout<<block_contents.ToString()<<std::endl;
@@ -333,6 +369,16 @@ void TableBuilder::WriteRawDataBlock(const Slice& block_contents,
   }
 }
 
+//20202/03/04
+/*void TableBuilder::GetKey(uint8_t *gkey)
+{
+	for(int i=0; i<KEY_SIZE; i++)
+	{
+		key[i] = *(gkey+i);
+		//std::cout<<*(gkey+i)<<std::endl;
+	}
+}*/
+
 Status TableBuilder::status() const { return rep_->status; }
 
 Status TableBuilder::Finish() {
@@ -340,6 +386,7 @@ Status TableBuilder::Finish() {
   Flush();
   assert(!r->closed);
   r->closed = true;
+
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
@@ -389,6 +436,7 @@ Status TableBuilder::Finish() {
       r->offset += footer_encoding.size();
     }
   }
+
   return r->status;
 }
 

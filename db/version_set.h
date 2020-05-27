@@ -247,6 +247,7 @@ class VersionSet {
   // Create an iterator that reads over the compaction inputs for "*c".
   // The caller should delete the iterator when no longer needed.
   Iterator* MakeInputIterator(Compaction* c);
+  Iterator* MakeMyInputIterator(Compaction* c,uint8_t* key);
 
   // Returns true iff some level needs a compaction.
   bool NeedsCompaction() const {
@@ -333,6 +334,8 @@ class Compaction {
 
   // Return the ith input file at "level()+which" ("which" must be 0 or 1).
   FileMetaData* input(int which, int i) const { return inputs_[which][i]; }
+
+  //uint8_t* GetCompactionKey{return inputs_[which][i]}
 
   // Maximum size of files to build during this compaction.
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }

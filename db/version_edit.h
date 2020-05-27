@@ -10,6 +10,9 @@
 #include <vector>
 
 #include "db/dbformat.h"
+#include "aes_gcm.h"
+
+#define KEY_SIZE GCM_256_KEY_LEN
 
 namespace leveldb {
 
@@ -24,6 +27,7 @@ struct FileMetaData {
   uint64_t file_size;    // File size in bytes
   InternalKey smallest;  // Smallest internal key served by table
   InternalKey largest;   // Largest internal key served by table
+  uint8_t key[KEY_SIZE];  //2020/03/01
 };
 
 class VersionEdit {
@@ -57,6 +61,8 @@ class VersionEdit {
     compact_pointers_.push_back(std::make_pair(level, key));
   }
 
+
+
   // Add the specified file at the specified number.
   // REQUIRES: This version has not been saved (see VersionSet::SaveTo)
   // REQUIRES: "smallest" and "largest" are smallest and largest keys in file
@@ -67,7 +73,76 @@ class VersionEdit {
     f.file_size = file_size;
     f.smallest = smallest;
     f.largest = largest;
+    AddKey(f.key);
+    //memset(f.key,1,KEY_SIZE);
+    //2020/03/11
+    /*srand (time(NULL));
+
+       for (int i=0; i<KEY_SIZE; i++)
+       {
+    	   char t,c;
+    	   t = rand() % 26;   // generate a random number
+    	   c = 'a' + t;
+             f.key[i]=c;            // Convert to a character from a-z
+       }*/
+
     new_files_.push_back(std::make_pair(level, f));
+    //printf("file_number=%ld,key=",f.number);
+    for(int i=0; i<100; i++)
+       std::cout<<"\n";
+
+       for(int i=0; i<KEY_SIZE; i++)
+       	std::cout<<f.key[i];
+    printf("\n");
+  }
+
+  void AddTheFile(int level, uint64_t file, uint64_t file_size,
+               const InternalKey& smallest, const InternalKey& largest) {
+    FileMetaData f;
+    f.number = file;
+    f.file_size = file_size;
+    f.smallest = smallest;
+    f.largest = largest;
+    memcpy(f.key,key,KEY_SIZE);
+    AddKey(f.key);
+    //memset(f.key,1,KEY_SIZE);
+    //2020/03/11
+    /*srand (time(NULL));
+
+       for (int i=0; i<KEY_SIZE; i++)
+       {
+    	   char t,c;
+    	   t = rand() % 26;   // generate a random number
+    	   c = 'a' + t;
+             f.key[i]=c;            // Convert to a character from a-z
+       }*/
+
+    new_files_.push_back(std::make_pair(level, f));
+    printf("file_number=%ld,key=",f.number);
+
+       for(int i=0; i<KEY_SIZE; i++)
+       	std::cout<<*(f.key+i);
+    printf("\n");
+  }
+
+
+
+
+  void GetKey(uint8_t* tkey){
+
+	  memcpy(key,tkey,KEY_SIZE);
+	  //std::cout<<"GetKey:"<<std::endl;
+	  //for(int i=0; i<KEY_SIZE; i++)
+	    //    std::cout<<*(key+i);
+  }
+
+  uint8_t* CompactKey(){
+	  return key;
+
+  }
+
+  void AddKey(uint8_t* tkey){
+	  memcpy(tkey,key,KEY_SIZE);
   }
 
   // Delete the specified "file" from the specified "level".
@@ -85,6 +160,7 @@ class VersionEdit {
 
   typedef std::set<std::pair<int, uint64_t>> DeletedFileSet;
 
+  uint8_t key[KEY_SIZE];  //20200407
   std::string comparator_;
   uint64_t log_number_;
   uint64_t prev_log_number_;

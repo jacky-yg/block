@@ -41,6 +41,7 @@ class BlockBuilder {
   // Returns an estimate of the current (uncompressed) size of the block
   // we are building.
   size_t CurrentSizeEstimate() const;
+  size_t CurrentSizeEstimate(int i) const;
 
   // Return true iff no entries have been added since the last Reset()
   bool empty() const { return buffer_.empty(); }

@@ -8,6 +8,9 @@
 #include "leveldb/env.h"
 #include "leveldb/table.h"
 #include "util/coding.h"
+#include "aes_gcm.h"
+
+#define KEY_SIZE GCM_256_KEY_LEN
 
 namespace leveldb {
 
@@ -40,6 +43,7 @@ TableCache::~TableCache() { delete cache_; }
 
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
                              Cache::Handle** handle) {
+
   Status s;
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
@@ -78,6 +82,9 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
 Iterator* TableCache::NewIterator(const ReadOptions& options,
                                   uint64_t file_number, uint64_t file_size,
                                   Table** tableptr) {
+  //std::cout<<"tablecache::iterator:"<<std::endl;
+  /*for(int i=0; i<KEY_SIZE; i++)
+	  	printf("%c",key[i]);*/
   if (tableptr != nullptr) {
     *tableptr = nullptr;
   }
@@ -97,15 +104,52 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
   return result;
 }
 
+
+Iterator* TableCache::MyNewIterator(const ReadOptions& options,
+                                  uint64_t file_number, uint64_t file_size,
+                                  uint8_t* key,Table** tableptr) {
+  //std::cout<<"tablecache::iterator:"<<std::endl;
+  /*for(int i=0; i<KEY_SIZE; i++)
+	  	printf("%c",key[i]);*/
+  if (tableptr != nullptr) {
+    *tableptr = nullptr;
+  }
+
+  Cache::Handle* handle = nullptr;
+  Status s = FindTable(file_number, file_size, &handle);
+  if (!s.ok()) {
+    return NewErrorIterator(s);
+  }
+
+  Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+  std::cout<<"tablecache"<<std::endl;
+  for(int i=0;i<KEY_SIZE;i++)
+	  std::cout<<*(key+i);
+  Iterator* result = table->MyNewIterator(options,key);
+  result->RegisterCleanup(&UnrefEntry, cache_, handle);
+  if (tableptr != nullptr) {
+    *tableptr = table;
+  }
+  return result;
+}
+
+
+
+
+void TableCache::AddKey(uint8_t* tkey)
+{
+	memcpy(key,tkey,KEY_SIZE);
+}
+
 Status TableCache::Get(const ReadOptions& options, uint64_t file_number,
                        uint64_t file_size, const Slice& k, void* arg,
                        void (*handle_result)(void*, const Slice&,
-                                             const Slice&)) {
+                                             const Slice&),uint8_t* key) {
   Cache::Handle* handle = nullptr;
   Status s = FindTable(file_number, file_size, &handle);
   if (s.ok()) {
     Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
-    s = t->InternalGet(options, k, arg, handle_result);
+    s = t->InternalGet(options, k, arg, handle_result,key);
     cache_->Release(handle);
   }
   return s;

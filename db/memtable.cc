@@ -56,6 +56,7 @@ class MemTableIterator : public Iterator {
   void Seek(const Slice& k) override { iter_.Seek(EncodeKey(&tmp_, k)); }
   void SeekToFirst() override { iter_.SeekToFirst(); }
   void SeekToLast() override { iter_.SeekToLast(); }
+
   void Next() override { iter_.Next(); }
   void Prev() override { iter_.Prev(); }
   Slice key() const override { return GetLengthPrefixedSlice(iter_.key()); }

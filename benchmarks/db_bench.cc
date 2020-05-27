@@ -17,6 +17,7 @@
 #include "util/mutexlock.h"
 #include "util/random.h"
 #include "util/testutil.h"
+#include <iostream>
 
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
@@ -774,8 +775,11 @@ class Benchmark {
       snprintf(key, sizeof(key), "%016d", k);
       if (db_->Get(options, key, &value).ok()) {
         found++;
+      }else{
+    	  std::cout<<"fail"<<std::endl;
       }
       thread->stats.FinishedSingleOp();
+
     }
     char msg[100];
     snprintf(msg, sizeof(msg), "(%d of %d found)", found, num_);

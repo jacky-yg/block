@@ -29,7 +29,7 @@ class IteratorWrapper {
     iter_ = iter;
     if (iter_ == nullptr) {
       valid_ = false;
-      std::cout<<"iter null"<<std::endl;
+      //std::cout<<"iter null"<<std::endl;
     } else {
       Update();
     }
@@ -73,6 +73,21 @@ class IteratorWrapper {
   void SeekToLast() {
     assert(iter_);
     iter_->SeekToLast();
+    Update();
+  }
+  void MySeek(const Slice& k,uint8_t* key) {
+    assert(iter_);
+    iter_->MySeek(k,key);
+    Update();
+  }
+  void MySeekToFirst(uint8_t* key) {
+    assert(iter_);
+    iter_->MySeekToFirst(key);
+    Update();
+  }
+  void MySeekToLast(uint8_t* key) {
+    assert(iter_);
+    iter_->MySeekToLast(key);
     Update();
   }
 
