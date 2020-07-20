@@ -512,7 +512,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    s = BuildLevel0Table(dbname_, env_, options_, table_cache_, iter, &meta, 0);
     mutex_.Lock();
   }
 
@@ -1015,6 +1015,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       if (compact->builder->NumEntries() == 0) {
         compact->current_output()->smallest.DecodeFrom(key);
       }
+      int level;
+      level = compact->compaction->level()+1;
+      std::cout<<"compact level"<<std::endl;
+      compact->builder->SetLevel(level);
       compact->current_output()->largest.DecodeFrom(key);
       compact->builder->Add(key, input->value());
       //2019

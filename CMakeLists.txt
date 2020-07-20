@@ -346,6 +346,7 @@ if(LEVELDB_BUILD_TESTS)
   leveldb_test("${PROJECT_SOURCE_DIR}/util/no_destructor_test.cc")
 
   if(NOT BUILD_SHARED_LIBS)
+    leveldb_test("${PROJECT_SOURCE_DIR}/test/compaction_observation.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/test/manifest_reader_test.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/test/put_get_test.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/test/table_builder_test.cc")

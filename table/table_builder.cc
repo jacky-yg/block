@@ -28,7 +28,8 @@
 #define KEY_SIZE GCM_256_KEY_LEN
 #define IV_SIZE  GCM_IV_DATA_LEN
 
-static int count = 1;
+static int multiple = 1;
+static int this_level = 0;
 
 
 
@@ -85,7 +86,7 @@ TableBuilder::TableBuilder(const Options& options, WritableFile* file)
   if (rep_->filter_block != nullptr) {
     rep_->filter_block->StartBlock(0);
   }
-  count++;
+
 }
 
 TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint8_t* tkey)
@@ -99,8 +100,25 @@ TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint8_t* 
 	  std::cout<<*(tkey+i);
 	  memcpy(key,tkey,KEY_SIZE);
   }
-  count++;
+
 }
+
+TableBuilder::TableBuilder(const Options& options, WritableFile* file, uint8_t* tkey, int level)
+    : rep_(new Rep(options, file)) {
+  if (rep_->filter_block != nullptr) {
+    rep_->filter_block->StartBlock(0);
+  }
+  std::cout<<"create table!!"<<std::endl;
+  for(int i=0; i<KEY_SIZE; i++)
+  {
+	  std::cout<<*(tkey+i);
+	  memcpy(key,tkey,KEY_SIZE);
+  }
+  this_level = level;
+  if(level == 0)
+	  multiple = 1;
+}
+
 
 TableBuilder::~TableBuilder() {
   assert(rep_->closed);  // Catch errors where caller forgot to call Finish()
@@ -122,6 +140,15 @@ Status TableBuilder::ChangeOptions(const Options& options) {
   rep_->index_block_options = options;
   rep_->index_block_options.block_restart_interval = 1;
   return Status::OK();
+}
+
+void TableBuilder::SetLevel(int level){
+
+	this_level = level;
+	if(this_level == 2)
+		multiple = 2;
+	if(this_level == 3)
+		multiple = 3;
 }
 
 void TableBuilder::Add(const Slice& key, const Slice& value) {
@@ -156,8 +183,8 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
-  int j = (count/5)+1;
-  const size_t estimated_block_size = r->data_block.CurrentSizeEstimate(j);
+  //int j = (count/5)+1;
+  const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
 
     Flush();
@@ -314,7 +341,7 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   Slice chiper(c);
 
   //2019
-  //std::cout<<"bsize:"<<bsize<<std::endl;
+  std::cout<<"level:"<<this_level<<",block_size:"<<bsize<<std::endl;
   WriteRawDataBlock(chiper, type, handle, bsize);
   block_contents.clear();
   //std::cout<<block_contents.ToString()<<std::endl;
@@ -386,7 +413,7 @@ Status TableBuilder::Finish() {
   Flush();
   assert(!r->closed);
   r->closed = true;
-
+  this_level = 0;
 
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 

@@ -27,6 +27,8 @@ class VersionEdit;
 
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
                   TableCache* table_cache, Iterator* iter, FileMetaData* meta);
+Status BuildLevel0Table(const std::string& dbname, Env* env, const Options& options,
+                  TableCache* table_cache, Iterator* iter, FileMetaData* meta, int level);
 
 }  // namespace leveldb
 

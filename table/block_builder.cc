@@ -58,13 +58,13 @@ void BlockBuilder::Reset() {
 }
 
 size_t BlockBuilder::CurrentSizeEstimate() const {
-  return (buffer_.size()*2 +                       // Raw data buffer
+  return (buffer_.size()/2 +                       // Raw data buffer
           restarts_.size() * sizeof(uint32_t) +  // Restart array
           sizeof(uint32_t));                     // Restart array length
 }
 
 size_t BlockBuilder::CurrentSizeEstimate(int i) const {
-  return (buffer_.size()*2/i +                       // Raw data buffer
+  return (buffer_.size()/i +                       // Raw data buffer
           restarts_.size() * sizeof(uint32_t) +  // Restart array
           sizeof(uint32_t));                     // Restart array length
 }

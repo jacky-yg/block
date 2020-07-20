@@ -36,6 +36,7 @@ class LEVELDB_EXPORT TableBuilder {
   TableBuilder(const Options& options, WritableFile* file);
 
   TableBuilder(const Options& options, WritableFile* file, uint8_t* key);
+  TableBuilder(const Options& options, WritableFile* file, uint8_t* key, int level);
 
   TableBuilder(const TableBuilder&) = delete;
   TableBuilder& operator=(const TableBuilder&) = delete;
@@ -57,6 +58,8 @@ class LEVELDB_EXPORT TableBuilder {
   // REQUIRES: key is after any previously added key according to comparator.
   // REQUIRES: Finish(), Abandon() have not been called
   void Add(const Slice& key, const Slice& value);
+
+  void SetLevel(int level);
 
   // Advanced operation: flush any buffered key/value pairs to file.
   // Can be used to ensure that two adjacent entries never live in
